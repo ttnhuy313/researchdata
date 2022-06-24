@@ -35,7 +35,7 @@ def process(repo):
     print('Processing ', fullName)
 
     if os.path.exists(BASE_DIR / "repo" / name):
-        shutil.rmtree(BASE_DIR / "repo" / name, ignore_errors=False, onerror= onerror)
+        shutil.rmtree(BASE_DIR / "repo" / name, ignore_errors=True, onerror= onerror)
 
     if not os.path.exists(BASE_DIR / "repo" / name):
         os.mkdir(BASE_DIR / "repo" / name)
@@ -44,8 +44,8 @@ def process(repo):
     preOid = ''
     for commit in repo.walk(repo.head.target, GIT_SORT_TOPOLOGICAL):
         print(commit.oid)
-        # if (preOid != ''):
-        #     print(repo.diff(repo.__getitem__(commit.oid), repo.__getitem__(preOid)).patch)
+        if (preOid != ''):
+            print(repo.diff(repo.__getitem__(commit.oid), repo.__getitem__(preOid)).patch)
         print()
         preOid = commit.oid
         
