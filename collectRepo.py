@@ -8,11 +8,11 @@ from time import sleep
 BASE_DIR = Path.cwd()
 
 if not os.path.exists(BASE_DIR / "repo" / "repoName.txt"):
-    with open(BASE_DIR / "repo" / "repoName.txt", 'w') as nameFile:
+    with open(BASE_DIR / "repo" / "repoName.txt", 'a') as nameFile:
         pass
 
 if not os.path.exists(BASE_DIR / "repo" / "repoURL.txt"):
-    with open(BASE_DIR / "repo" / "repoURL.txt", 'w') as urlFile:
+    with open(BASE_DIR / "repo" / "repoURL.txt", 'a') as urlFile:
         pass
 
 #log in github to use search api

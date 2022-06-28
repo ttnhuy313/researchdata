@@ -1,0 +1,675 @@
+684a298d69aa597a72c25498c739a80d10ad41a1
+diff --git a/assets/loading/doge_coin.gif b/assets/loading/doge_coin.gif
+deleted file mode 100644
+index 00a6a3f..0000000
+Binary files a/assets/loading/doge_coin.gif and /dev/null differ
+diff --git a/assets/loading/logo_splash.png b/assets/loading/logo_splash.png
+deleted file mode 100644
+index 2c84a59..0000000
+Binary files a/assets/loading/logo_splash.png and /dev/null differ
+diff --git a/assets/loading/transparent_loading.gif b/assets/loading/transparent_loading.gif
+new file mode 100644
+index 0000000..5c802eb
+Binary files /dev/null and b/assets/loading/transparent_loading.gif differ
+diff --git a/lib/controllers/game_controller.dart b/lib/controllers/game_controller.dart
+index 8a818cf..42a9ccc 100644
+--- a/lib/controllers/game_controller.dart
++++ b/lib/controllers/game_controller.dart
+@@ -5,7 +5,6 @@ import 'package:get/get.dart';
+ import 'package:flutter/material.dart';
+ import 'package:trivia_app/controllers/score_controller.dart';
+ import 'package:trivia_app/views/pages/end_page.dart';
+-import 'package:trivia_app/views/pages/question_template/answer_info_page.dart';
+ import 'package:trivia_app/views/pages/question_template/answer_reveal_page.dart';
+ import 'package:trivia_app/views/pages/question_template/question_poll_page.dart';
+ import 'package:trivia_app/views/pages/question_template/question_title_page.dart';
+@@ -13,63 +12,40 @@ import 'package:trivia_app/views/pages/question_template/question_title_page.dar
+ import '../models/question.dart';
+ import '../utils/custom_routing.dart';
+
+-
+ class GameController extends GetxController with GetTickerProviderStateMixin {
+   late AnimationController _countdownController;
+   late Animation _countdown;
+   final List<Question> _questionList = [];
+   int _index = 0;
+-  final int questionLength = 20;
+-
+-  // called immediately after the widget is allocated memory
+-  @override
+-  void onInit() async {
+-    // questions
+-    DatabaseReference questionRef =
+-        FirebaseDatabase.instance.ref().child('/game bank/2022/questions');
+-
+-    await questionRef.get().then((DataSnapshot snapshot) {
+-      for (var q in (snapshot.value as List)) {
+-        if (q != null) {
+-          Question question = Question.fromRTDB(q);
+-          _questionList.add(question);
+-          // print('${question.id} ${question.additionInfo}  ${question.clock}');
+-        }
+-      }
+-    }).catchError((error) => print(error));
+-
+-    // countdown
+-    _countdownController =
+-        AnimationController(duration: const Duration(seconds: 30), vsync: this);
+-
+-    _countdown = Tween<double>(begin: 1, end: 0).animate(_countdownController)
+-      ..addListener(() {
+-        // update = setState
+-        update();
+-      });
+-
+-    super.onInit();
+-  }
+-
+-  @override
+-  void onClose() {
+-    print("QuestionController closed");
+-    _countdownController.dispose();
+-    super.onClose();
+-  }
+
+   // getters
+   Animation get countdown => _countdown;
+
+   int get index => _index;
+
+-  String? get additionInfo => _questionList[index].additionInfo;
+-
+   int get duration => _questionList[index].clock;
+
+-  int get questionsLength => questionLength;
++  int get questionsLength => _questionList.length;
+
+   // helpful methods
++  Future<void> fetchQuestions() async {
++    DatabaseReference questionRef =
++        FirebaseDatabase.instance.ref().child('/game bank/2022/questions');
++
++    await questionRef
++        .get()
++        .then((DataSnapshot snapshot) {
++          for (var q in (snapshot.value as List)) {
++            if (q != null) {
++              Question question = Question.fromRTDB(q);
++              _questionList.add(question);
++            }
++          }
++        })
++        .then((_) => print('question list fetched'))
++        .catchError((error) => print(error));
++  }
++
+   Future<void> resetQuestionState() async {
+     print("index $index, timer: ${_questionList[index].clock}");
+
+@@ -97,12 +73,11 @@ class GameController extends GetxController with GetTickerProviderStateMixin {
+
+   // page 1
+   Future<void> gotoQuestionTitle() async {
+-    if (_index >= questionLength - 1) {
++    if (_index >= questionsLength) {
+       Get.offAndToNamed(EndPage.routeName);
+     } else {
+-      // Get.offAndToNamed(QuestionTitlePage.routeName);
+       CustomRouter.customGetTo(const QuestionTitlePage());
+-      await Future.delayed(const Duration(seconds: 3), () {
++      await Future.delayed(const Duration(seconds: 10), () {
+         gotoPollPage();
+       });
+     }
+@@ -118,31 +93,32 @@ class GameController extends GetxController with GetTickerProviderStateMixin {
+   }
+
+   // page 3
+-  Future<void> gotoAnswerInfo() async {
+-    _countdownController.stop();
+-
+-    if (_index >= questionLength - 1) {
+-      Get.offAndToNamed(EndPage.routeName);
+-    } else {
+-      // no fun facts to show, go to page 1
+-      if (_questionList[index].additionInfo != "" &&
+-          _questionList[index].additionInfo != null) {
+-        CustomRouter.customGetTo(const AnswerInfoPage());
+-        await Future.delayed(const Duration(seconds: 5), () {
+-          gotoAnswerReveal();
+-        });
+-      } else {
+-        gotoAnswerReveal();
+-      }
+-    }
+-  }
+-
+-  // page 4
+   void gotoAnswerReveal() {
+     CustomRouter.customGetTo(const AnswerRevealPage());
++  }
++
++  // called immediately after the widget is allocated memory
++  @override
++  void onInit() async {
++    super.onInit();
+
+-    // Future.delayed(const Duration(seconds: 6), () {
+-    //   gotoQuestionTitle();
+-    // });
++    await fetchQuestions();
++
++    // countdown
++    _countdownController =
++        AnimationController(duration: const Duration(seconds: 30), vsync: this);
++
++    _countdown = Tween<double>(begin: 1, end: 0).animate(_countdownController)
++      ..addListener(() {
++        // update = setState
++        update();
++      });
++  }
++
++  @override
++  void onClose() {
++    print("QuestionController closed");
++    _countdownController.dispose();
++    super.onClose();
+   }
+ }
+diff --git a/lib/controllers/score_controller.dart b/lib/controllers/score_controller.dart
+index c199822..eb66ccc 100644
+--- a/lib/controllers/score_controller.dart
++++ b/lib/controllers/score_controller.dart
+@@ -35,6 +35,8 @@ class ScoreController extends GetxController with GetTickerProviderStateMixin {
+
+   String get fullCorrectAnswer => _answerList[index].fullCorrect;
+
++  int get questionsLength => _answerList.length;
++
+   // settlers
+   void setIndex(int value) {
+     _index = value;
+@@ -58,14 +60,18 @@ class ScoreController extends GetxController with GetTickerProviderStateMixin {
+       DatabaseReference questionRef =
+           FirebaseDatabase.instance.ref().child('/game bank/2022/questions');
+
+-      await questionRef.get().then((DataSnapshot snapshot) {
+-        for (var q in (snapshot.value as List)) {
+-          if (q != null) {
+-            Answer answer = Answer.fromRTDB(q);
+-            _answerList.add(answer);
+-          }
+-        }
+-      }).catchError((error) => print(error));
++      await questionRef
++          .get()
++          .then((DataSnapshot snapshot) {
++            for (var q in (snapshot.value as List)) {
++              if (q != null) {
++                Answer answer = Answer.fromRTDB(q);
++                _answerList.add(answer);
++              }
++            }
++          })
++          .then((_) => print('answer list fetched'))
++          .catchError((error) => print(error));
+     }
+   }
+
+@@ -84,10 +90,8 @@ class ScoreController extends GetxController with GetTickerProviderStateMixin {
+
+   Future<void> checkAndPostAnswer() async {
+     print('bet=$_bet, user answered=$_userAnswer');
+-    print(
+-        'user answered '
+-            '${_answerList[index].correct == _userAnswer
+-            ? 'correct' : 'wrong'}');
++    print('user answered '
++        '${_answerList[index].correct == _userAnswer ? 'correct' : 'wrong'}');
+
+     if (_userAnswer == _answerList[index].correct) {
+       _result = _bet;
+diff --git a/lib/main.dart b/lib/main.dart
+index 66e12a7..267e46e 100644
+--- a/lib/main.dart
++++ b/lib/main.dart
+@@ -12,6 +12,8 @@ import 'package:trivia_app/utils/custom_routing.dart';
+ // import 'package:trivia_app/views/pages/end_page.dart';
+ // import 'package:trivia_app/views/pages/guidelines_page.dart';
+ import 'package:trivia_app/views/pages/landing_page.dart';
++import 'package:trivia_app/views/pages/lobby_page.dart';
++import 'package:trivia_app/views/pages/rules_page.dart';
+ // import 'package:trivia_app/views/pages/lobby_page.dart';
+ // import 'package:trivia_app/views/pages/question_template/answer_info_page.dart';
+ // import 'package:trivia_app/views/pages/question_template/answer_reveal_page.dart';
+@@ -35,7 +37,6 @@ void main() async {
+   // await FirebaseAuth.instance.setPersistence(Persistence.SESSION);
+   // delete this after done
+   // await AuthService.signOut();
+-
+   GameController _gameController = Get.put(GameController());
+   ScoreController _scoreController = Get.put(ScoreController());
+
+@@ -43,11 +44,20 @@ void main() async {
+       FirebaseDatabase.instance.ref().child('/gameplay/2022/game status/');
+
+   statusRef.onChildChanged.listen((event) async {
+-    var questionNum = event.snapshot.value ?? 1;
++    var questionNum = int.tryParse(event.snapshot.value.toString()) ?? 0;
+     var pin = AuthService.getPin();
+     var isNamed = await RtdbUserService.isNamed(pin);
++    GameController _gameController = Get.put(GameController());
++    ScoreController _scoreController = Get.put(ScoreController());
++
++    if(_gameController.questionsLength == 0) {
++      await _gameController.fetchQuestions();
++    }
++    if(_scoreController.questionsLength == 0) {
++      await _scoreController.fetchAnswers();
++    }
+
+-    if (AuthService.isSignedIn() && isNamed) {
++    if (AuthService.isSignedIn() && isNamed && questionNum > 0) {
+       if (event.snapshot.key == 'current') {
+         print('proceed to question $questionNum');
+
+@@ -61,7 +71,7 @@ void main() async {
+         await _scoreController.fetchTotalScore();
+         await _scoreController.fetchChange();
+
+-        _gameController.gotoAnswerInfo();
++        _gameController.gotoAnswerReveal();
+       }
+     }
+   });
+diff --git a/lib/models/question.dart b/lib/models/question.dart
+index 3b26d82..1cf7092 100644
+--- a/lib/models/question.dart
++++ b/lib/models/question.dart
+@@ -1,18 +1,15 @@
+ class Question {
+   final int id, clock;
+-  final String? additionInfo;
+
+   Question(
+       {required this.id,
+-      required this.clock,
+-      this.additionInfo});
++      required this.clock});
+
+
+   factory Question.fromRTDB(Map data){
+     return Question(
+       id: data['qid'],
+       clock: data['timer'],
+-      additionInfo: data['fun fact'],
+     );
+   }
+
+diff --git a/lib/utils/custom_routing.dart b/lib/utils/custom_routing.dart
+index 59bd1a5..5d62fdf 100644
+--- a/lib/utils/custom_routing.dart
++++ b/lib/utils/custom_routing.dart
+@@ -1,4 +1,3 @@
+-import 'package:flutter/cupertino.dart';
+ import 'package:flutter/material.dart';
+ import 'package:get/get.dart';
+
+@@ -9,7 +8,6 @@ import '../views/pages/end_page.dart';
+ import '../views/pages/guidelines_page.dart';
+ import '../views/pages/landing_page.dart';
+ import '../views/pages/lobby_page.dart';
+-import '../views/pages/question_template/answer_info_page.dart';
+ import '../views/pages/question_template/answer_reveal_page.dart';
+ import '../views/pages/question_template/question_poll_page.dart';
+ import '../views/pages/question_template/question_title_page.dart';
+@@ -49,8 +47,6 @@ class CustomRouter {
+         return MaterialPageRoute(builder: (_) => const QuestionPollPage());
+       case AnswerRevealPage.routeName:
+         return MaterialPageRoute(builder: (_) => const AnswerRevealPage());
+-      case AnswerInfoPage.routeName:
+-        return MaterialPageRoute(builder: (_) => const AnswerInfoPage());
+       case TestFirebasePage.routeName:
+         return MaterialPageRoute(builder: (_) => const TestFirebasePage());
+       case CreateUserPage.routeName:
+diff --git a/lib/views/pages/landing_page.dart b/lib/views/pages/landing_page.dart
+index f4373f2..98c9848 100644
+--- a/lib/views/pages/landing_page.dart
++++ b/lib/views/pages/landing_page.dart
+@@ -31,7 +31,7 @@ class _LandingPageState extends State<LandingPage>
+     ).animate(CurvedAnimation(parent: anime, curve: Curves.easeInOutCubic));
+   }
+
+-  void runAnimation() {
++  void run_animation() {
+     anime.reset();
+     anime.forward();
+   }
+@@ -126,7 +126,7 @@ class _LandingPageState extends State<LandingPage>
+                     top: -40,
+                     left: -d * 300,
+                     child: Container(
+-                      color: Colors.black12,
++                      color: Colors.transparent,
+                       height: MediaQuery
+                           .of(context)
+                           .size
+@@ -186,8 +186,8 @@ class _LandingPageState extends State<LandingPage>
+                   );
+               }),
+           Positioned(
+-            top: viewHeight * 2.0 / 4.0,
+-            left: (viewWidth - 250) / 2.0,
++            top: viewHeight * 2.0 / 4.0 - max(0, MediaQuery.of(context).viewInsets.bottom - viewHeight * 2.0 / 4.0),
++            left: (viewWidth - 300) / 2.0,
+             child: TextFieldWithButton(
+               validator: inputValidator,
+               updator: inputUpdator,
+@@ -196,7 +196,9 @@ class _LandingPageState extends State<LandingPage>
+               successMsg: 'Game joined!',
+               hintText: 'Enter game code',
+               isKeyboard: isKeyboard,
+-              runAnimation: runAnimation,
++              width: 300,
++              height: 80,
++              run_animation: run_animation,
+             ),
+           ),
+         ]),
+diff --git a/lib/views/pages/lobby_page.dart b/lib/views/pages/lobby_page.dart
+index fc39564..8f2bc09 100644
+--- a/lib/views/pages/lobby_page.dart
++++ b/lib/views/pages/lobby_page.dart
+@@ -26,7 +26,7 @@ class _LobbyPageState extends State<LobbyPage> with TickerProviderStateMixin {
+     anime.repeat();
+   }
+
+-  void runAnimation() {
++  void run_animation() {
+     anime.reset();
+     anime.forward();
+   }
+diff --git a/lib/views/pages/question_template/answer_info_page.dart b/lib/views/pages/question_template/answer_info_page.dart
+deleted file mode 100644
+index c1584a7..0000000
+--- a/lib/views/pages/question_template/answer_info_page.dart
++++ /dev/null
+@@ -1,38 +0,0 @@
+-import 'package:flutter/material.dart';
+-import 'package:get/get.dart';
+-import 'package:get/get_core/src/get_main.dart';
+-import 'package:trivia_app/consts/app_styles.dart';
+-
+-import '../../../controllers/game_controller.dart';
+-
+-class AnswerInfoPage extends StatelessWidget {
+-  static const routeName = "/answer-info";
+-
+-  const AnswerInfoPage({Key? key}) : super(key: key);
+-
+-  @override
+-  Widget build(BuildContext context) {
+-    GameController _gameController = Get.put(GameController());
+-
+-    return Scaffold(
+-      body: SafeArea(
+-        child: Column(
+-          children: [
+-            const Expanded(
+-              flex: 1,
+-              child: Center(
+-                child: Text(
+-                  "Some funfacts about this quesiton",
+-                  style: triviaHeading1,
+-                ),
+-              ),
+-            ),
+-            Expanded(
+-                flex: 2,
+-                child: Text(_gameController.additionInfo ?? ""))
+-          ],
+-        ),
+-      ),
+-    );
+-  }
+-}
+diff --git a/lib/views/pages/team_formation_page.dart b/lib/views/pages/team_formation_page.dart
+index 3f3dc2f..fb686ed 100644
+--- a/lib/views/pages/team_formation_page.dart
++++ b/lib/views/pages/team_formation_page.dart
+@@ -38,7 +38,7 @@ class _TeamFormationPageState extends State<TeamFormationPage>
+     ).animate(CurvedAnimation(parent: anime, curve: Curves.easeInOutCubic));
+   }
+
+-  void runAnimation() {
++  void run_animation() {
+     anime.reset();
+     anime.forward();
+   }
+@@ -187,19 +187,21 @@ class _TeamFormationPageState extends State<TeamFormationPage>
+               builder: (context, _) {
+                 final mv = movement2.value.toDouble();
+                 return Positioned(
+-                    top: viewHeight * 2.0 / 4.0,
++                    top: viewHeight * 2.0 / 4.0 - max(0, MediaQuery.of(context).viewInsets.bottom - viewHeight * 2.0 / 4.0),
+                     left: (viewWidth -
+-                            (-mv * 100 + 250)) /
++                            (-mv * 150 + 300)) /
+                         2.0,
+                     child: Container(
+-                      width: -mv * 100 + 250,
++                      width: -mv * 150 + 300,
+                       child: TextFieldWithButton(
+-                          runAnimation: runAnimation,
++                          run_animation: run_animation,
+                           validator: inputValidator,
+                           updator: inputUpdator,
+                           routeName: LobbyPage.routeName,
+                           failMsg: 'An error has occured',
+-                          hintText: 'Enter your group name',
++                          hintText: 'Your group name',
++                          width: 300,
++                          height: 80,
+                           successMsg:
+                               'Welcome, $_name!',
+                           isKeyboard: isKeyboard),
+diff --git a/lib/views/widgets/TextFieldWithButton.dart b/lib/views/widgets/TextFieldWithButton.dart
+index 0436ed3..b0d6783 100644
+--- a/lib/views/widgets/TextFieldWithButton.dart
++++ b/lib/views/widgets/TextFieldWithButton.dart
+@@ -13,8 +13,10 @@ class TextFieldWithButton extends StatefulWidget {
+       required this.updator,
+       required this.failMsg,
+       required this.successMsg,
+-      required this.runAnimation,
+-      required this.hintText})
++      required this.run_animation,
++      required this.hintText,
++      required this.width,
++      required this.height})
+       : super(key: key);
+
+   final String routeName;
+@@ -23,8 +25,10 @@ class TextFieldWithButton extends StatefulWidget {
+   final bool isKeyboard;
+   final Function validator;
+   final Function updator;
+-  final Function runAnimation;
++  final Function run_animation;
+   final String hintText;
++  final double width;
++  final double height;
+
+   // final Function customValidate;
+
+@@ -35,6 +39,12 @@ class TextFieldWithButton extends StatefulWidget {
+ class _TextFieldWithButtonState extends State<TextFieldWithButton> {
+   final _formKey = GlobalKey<FormState>();
+   final TextEditingController _controller = TextEditingController();
++  var p1;
++
++  @override
++  void initState() {
++    p1 = Image.asset('assets/images/next_page_button.png');
++  }
+
+   @override
+   Widget build(BuildContext context) {
+@@ -43,7 +53,7 @@ class _TextFieldWithButtonState extends State<TextFieldWithButton> {
+
+       if (status) {
+         CustomSnackBar.showSuccessSnackBar(context, widget.successMsg);
+-        widget.runAnimation();
++        widget.run_animation();
+         await Future.delayed(const Duration(milliseconds: 1500));
+         ScaffoldMessenger.of(context).hideCurrentSnackBar();
+         await Future.delayed(const Duration(milliseconds: 5000));
+@@ -61,50 +71,54 @@ class _TextFieldWithButtonState extends State<TextFieldWithButton> {
+     }
+
+     return Container(
+-      width: 270,
+-      height: 100,
+-      color: Colors.black45,
++      width: widget.width,
++      height: widget.height,
++      color: Colors.transparent,
+       child: Stack(children: <Widget>[
+-        Row(
+-          children: [
+-            Expanded(
+-              flex: 4,
+-              child: Align(
+-                alignment: Alignment.topCenter,
+-                child: Image.asset(
+-                  'assets/images/InputBox2.png',
+-                  fit: BoxFit.fill,
+-                  height: 80,
+-                ),
+-              ),
+-            ),
+-            widget.isKeyboard
+-                ? Expanded(
+-                    flex: 1,
+-                    child: Align(
+-                      alignment: Alignment.topRight,
+-                      child: IconButton(
+-                        icon: const Icon(Icons.navigate_next),
+-                        iconSize: 40,
+-                        onPressed: () async {
+-                          widget.runAnimation();
+-                          Future.delayed(const Duration(seconds: 5));
+-                          if (_formKey.currentState!.validate()) {
+-                            // close keyboard
+-                            FocusManager.instance.primaryFocus?.unfocus();
+-
+-                            await onSubmitValidate();
+-                          }
+-                        },
+-                      ),
+-                    ))
+-                : const SizedBox.shrink()
+-          ],
++        Container(
++          width: 250.0 / 300.0 * widget.width,
++          height: widget.height,
++          child: Image.asset(
++            'assets/images/InputBox2.png',
++            fit: BoxFit.fill,
++            height: widget.height,
++          ),
+         ),
+-        Align(
+-          alignment: const Alignment(0.1, -1),
++        widget.isKeyboard
++            ? Align(
++                alignment: Alignment.centerRight,
++                child: GestureDetector(
++                  onTapDown: (tap) async {
++                    setState(() {
++                      p1 = Image.asset(
++                          'assets/images/next_page_button_pressed.png');
++                    });
++                  },
++                  onTapCancel: () => {
++                    setState(() {
++                      p1 = Image.asset('assets/images/next_page_button.png');
++                    })
++                  },
++                  onTapUp: (tap) async {
++                    setState(() {
++                      p1 = Image.asset('assets/images/next_page_button.png');
++                    });
++                    Future.delayed(Duration(seconds: 5));
++                    if (_formKey.currentState!.validate()) {
++                      // close keyboard
++                      FocusManager.instance.primaryFocus?.unfocus();
++
++                      await onSubmitValidate();
++                    };
++                  },
++                  child: Container(width: widget.width / 9, child: p1),
++                ),
++              )
++            : const SizedBox.shrink(),
++        Positioned(
++          left: 0,
+           child: Container(
+-            width: 240,
++            width: widget.width * 0.8,
+             child: Form(
+               key: _formKey,
+               child: TextFormField(
+@@ -116,18 +130,18 @@ class _TextFieldWithButtonState extends State<TextFieldWithButton> {
+                   }
+                 },
+                 controller: _controller,
+-                textAlignVertical: TextAlignVertical.bottom,
++                textAlign: TextAlign.center,
++                // textAlignVertical: TextAlignVertical.bottom,
+                 decoration: InputDecoration(
+-                  contentPadding: const EdgeInsets.only(bottom: 8, left: 15),
+                   focusedBorder: const OutlineInputBorder(
+                     borderSide:
+                         BorderSide(color: Colors.transparent, width: 4.0),
+                   ),
+                   enabledBorder: const OutlineInputBorder(
+                     borderSide:
+-                        const BorderSide(color: Colors.transparent, width: 5.0),
++                        BorderSide(color: Colors.transparent, width: 5.0),
+                   ),
+-                  hintText: this.widget.hintText,
++                  hintText: widget.hintText,
+                 ),
+               ),
+             ),
+diff --git a/web/index.html b/web/index.html
+index 7acc463..8874f85 100644
+--- a/web/index.html
++++ b/web/index.html
+@@ -37,22 +37,20 @@
+       .loading_container {
+         width: 100vw;
+         height: 100vh;
+-        background-color: ;
+         display: flex; /* Default Axis is X*/
+         justify-content: center; /* Main Axis */
+         align-items: center; /* Cross Axis */
+         background-image: url('./assets/loading/BackGround.png');
+       }
+       .app_logo{
+-        width: 30vw;
++        width: 70vw;
+       }
+   </style>
+ </head>
+ <body>
+   <!-- on web loading -->
+   <div id="loading_indicator" class="loading_container">
+-<!--    <img class="app_logo" src="./assets/loading/logo_splash.png" />-->
+-    <img class="app_logo" src="./assets/loading/doge_coin.gif"/>
++    <img class="app_logo" src="./assets/loading/transparent_loading.gif"/>
+   </div>
+   <!-- This script installs service_worker.js to provide PWA functionality to
+        application. For more information, see:
